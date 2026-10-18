@@ -1,0 +1,121 @@
+<UserControl x:Class="Aura.Views.LibraryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root">
+  <Grid Margin="40,30,28,0">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <DockPanel>
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+        <Button x:Name="OpenFolderButton" Click="OpenFolder_Click" Margin="0,0,8,0">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Style="{StaticResource Icon}" FontSize="13" Text="&#xE838;" />
+            <TextBlock x:Name="OpenFolderText" Margin="8,0,0,0" />
+          </StackPanel>
+        </Button>
+        <Button Style="{StaticResource PrimaryButton}" Click="Add_Click">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Style="{StaticResource Icon}" FontSize="13" Text="&#xE710;" />
+            <TextBlock x:Name="AddLabel" Margin="8,0,0,0" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+      <StackPanel>
+        <TextBlock x:Name="TitleText" Style="{StaticResource H1}" />
+        <TextBlock x:Name="SubtitleText" Style="{StaticResource Sub}" TextTrimming="CharacterEllipsis" />
+      </StackPanel>
+    </DockPanel>
+
+    <DockPanel Grid.Row="1" Margin="0,22,12,14">
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+        <TextBlock x:Name="TargetLabel" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="13" />
+        <ComboBox x:Name="TargetBox" SelectionChanged="Target_Changed" MinWidth="200" />
+      </StackPanel>
+      <WrapPanel>
+        <TextBox x:Name="SearchBox" Width="280" Margin="0,0,16,8" TextChanged="Search_Changed" />
+        <RadioButton x:Name="FilterAll" Style="{StaticResource Pill}" GroupName="libfilter" IsChecked="True" Checked="Filter_Checked" />
+        <RadioButton x:Name="FilterVideos" Style="{StaticResource Pill}" GroupName="libfilter" Checked="Filter_Checked" />
+        <RadioButton x:Name="FilterImages" Style="{StaticResource Pill}" GroupName="libfilter" Checked="Filter_Checked" />
+      </WrapPanel>
+    </DockPanel>
+
+    <ScrollViewer Grid.Row="2" x:Name="Scroller" VerticalScrollBarVisibility="Auto" Padding="0,0,12,0"
+                  SizeChanged="Scroller_SizeChanged">
+      <ItemsControl x:Name="Cards" Margin="0,0,0,24">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel ItemWidth="{Binding CardSlot, ElementName=Root}" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Border x:Name="Card" Margin="0,0,16,16" CornerRadius="14" Background="{StaticResource Card}"
+                    BorderBrush="{StaticResource Line}" BorderThickness="1" Cursor="Hand"
+                    MouseLeftButtonUp="Card_Click" ContextMenuOpening="Card_ContextMenuOpening" Tag="{Binding}">
+              <Border.ContextMenu>
+                <ContextMenu />
+              </Border.ContextMenu>
+              <StackPanel>
+                <Grid Height="{Binding CardImageHeight, ElementName=Root}">
+                  <Border CornerRadius="13,13,0,0" Background="{StaticResource Side}" />
+                  <Border CornerRadius="13,13,0,0">
+                    <Border.Background>
+                      <ImageBrush ImageSource="{Binding Thumb}" Stretch="UniformToFill" />
+                    </Border.Background>
+                  </Border>
+                  <Border Style="{StaticResource Badge}">
+                    <TextBlock Text="{Binding Kind}" FontSize="10" FontWeight="SemiBold" Foreground="White" />
+                  </Border>
+                  <Border Background="{StaticResource AuroraBrush}" CornerRadius="6" Padding="8,2"
+                          HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0"
+                          Visibility="{Binding IsActive, Converter={StaticResource Vis}}">
+                    <TextBlock Text="{Binding ActiveText}" FontSize="10" FontWeight="SemiBold" Foreground="#0B0C12" />
+                  </Border>
+                  <Border x:Name="Hover" CornerRadius="13,13,0,0" Background="{StaticResource Scrim}" Visibility="Collapsed">
+                    <Border Background="{StaticResource AuroraBrush}" CornerRadius="18" Padding="18,8"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                      <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Icon}" FontSize="12" Text="&#xE768;" Foreground="#0B0C12" />
+                        <TextBlock Text="{Binding HoverText}" Margin="8,0,0,0" FontWeight="SemiBold" Foreground="#0B0C12" />
+                      </StackPanel>
+                    </Border>
+                  </Border>
+                </Grid>
+                <StackPanel Margin="14,10,14,12">
+                  <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Subtitle}" FontSize="12" Foreground="{StaticResource Muted}" Margin="0,3,0,0" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+            <DataTemplate.Triggers>
+              <Trigger SourceName="Card" Property="IsMouseOver" Value="True">
+                <Setter TargetName="Hover" Property="Visibility" Value="Visible" />
+                <Setter TargetName="Card" Property="Background" Value="{StaticResource CardHover}" />
+              </Trigger>
+              <DataTrigger Binding="{Binding IsActive}" Value="True">
+                <Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource Accent}" />
+              </DataTrigger>
+            </DataTemplate.Triggers>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+    <!-- Empty state -->
+    <StackPanel x:Name="EmptyState" Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center"
+                Margin="0,0,0,80" Visibility="Collapsed" MaxWidth="420">
+      <Border Width="88" Height="88" CornerRadius="44" Background="{StaticResource Card}" HorizontalAlignment="Center">
+        <TextBlock Style="{StaticResource Icon}" FontSize="34" Text="&#xE8B9;" HorizontalAlignment="Center"
+                   Foreground="{StaticResource Accent}" />
+      </Border>
+      <TextBlock x:Name="EmptyTitle" Style="{StaticResource H2}" HorizontalAlignment="Center" Margin="0,20,0,6" FontSize="20" />
+      <TextBlock x:Name="EmptyBody" Style="{StaticResource Sub}" TextAlignment="Center" />
+      <Button x:Name="EmptyButton" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Center" Margin="0,20,0,0"
+              Click="GoExplore_Click" Padding="20,10" />
+    </StackPanel>
+  </Grid>
+</UserControl>

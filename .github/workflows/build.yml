@@ -1,0 +1,116 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+
+jobs:
+  build:
+    runs-on: windows-2022
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - id: ver
+        shell: pwsh
+        run: |
+          $v = if ($env:GITHUB_REF -like 'refs/tags/v*') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '1.0.0' }
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Unit tests
+        run: dotnet test tests/Aura.Core.Tests -c Release
+        env:
+          AURA_LIVE: '1'
+
+      - name: Publish app
+        run: >
+          dotnet publish src/Aura -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true -p:DebugType=none
+          -p:Version=${{ steps.ver.outputs.version }} -o publish
+
+      - name: Bundle mpv
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./scripts/get-mpv.ps1 -Dest publish/mpv
+
+      - name: Installer
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\aura.iss /DAppVersion=${{ steps.ver.outputs.version }}
+          Compress-Archive -Path publish\* -DestinationPath out\Aura-Portable-${{ steps.ver.outputs.version }}.zip
+          Get-ChildItem out | Format-Table Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aura-windows
+          path: out/*
+          if-no-files-found: error
+
+  selftest:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: aura-windows
+          path: dist
+
+      - name: Run Aura self-test
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist -Filter 'Aura-Portable-*.zip' | Select-Object -First 1
+          Expand-Archive $zip.FullName -DestinationPath app
+          $out = Join-Path $PWD 'selftest'
+          New-Item -ItemType Directory -Force $out | Out-Null
+          Get-Process explorer -ErrorAction SilentlyContinue | Format-Table Id, SessionId
+          $p = Start-Process -FilePath app\Aura.exe -ArgumentList '--selftest', "`"$out`"" -PassThru
+          if (-not $p.WaitForExit(240000)) { $p.Kill(); Write-Host 'self-test timed out' }
+          Copy-Item "$env:LOCALAPPDATA\Aura\logs\*" $out -ErrorAction SilentlyContinue
+          if (Test-Path "$out\report.txt") { Get-Content "$out\report.txt" } else { Write-Host 'no report' }
+          "exit=$($p.ExitCode)" | Out-File "$out\exit.txt"
+          if ($p.ExitCode -ne 0) { exit 1 }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: selftest-${{ matrix.os }}
+          path: |
+            selftest/*.png
+            selftest/*.txt
+            selftest/*.log
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, selftest]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: aura-windows
+          path: dist
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY"
+          --title "Aura $GITHUB_REF_NAME" --notes "Instalador: Aura-Setup. Sin instalar: Aura-Portable."
