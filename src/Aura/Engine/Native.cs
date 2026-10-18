@@ -172,6 +172,10 @@ internal static class Native
     [DllImport("dwmapi.dll")]
     public static extern int DwmSetWindowAttribute(IntPtr hWnd, int attr, ref int value, int size);
 
+    [DllImport("kernel32.dll")]
+    public static extern uint SetErrorMode(uint mode);
+    public const uint SEM_FAILCRITICALERRORS = 0x0001;
+
     public static string ClassName(IntPtr hWnd)
     {
         var sb = new StringBuilder(256);

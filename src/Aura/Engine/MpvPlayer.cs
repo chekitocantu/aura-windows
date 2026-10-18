@@ -155,7 +155,11 @@ internal sealed class MpvPlayer : IDisposable
         {
             ct.ThrowIfCancellationRequested();
             if (process.HasExited)
-                throw new InvalidOperationException($"mpv closed right away (code {process.ExitCode}). Is the file a valid video?");
+            {
+                throw new InvalidOperationException(process.ExitCode == unchecked((int)0xC0000135)
+                    ? "mpv is missing a system DLL (code 0xC0000135). Reinstall Aura or update the graphics driver."
+                    : $"mpv closed right away (code {process.ExitCode}). Is the file a valid video?");
+            }
 
             var found = IntPtr.Zero;
             Native.EnumWindows((h, _) =>

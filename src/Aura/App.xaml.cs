@@ -34,6 +34,10 @@ public partial class App : Application
         AppDomain.CurrentDomain.UnhandledException += (_, ex) => Log.Write($"FATAL {ex.ExceptionObject}");
         TaskScheduler.UnobservedTaskException += (_, ex) => { Log.Error("task", ex.Exception); ex.SetObserved(); };
 
+        // Child processes (mpv) inherit this: a missing DLL makes them exit with an error code
+        // instead of showing a "System Error" box that nobody sees behind the desktop.
+        Native.SetErrorMode(Native.SEM_FAILCRITICALERRORS);
+
         var args = e.Args;
         var selfTest = Array.IndexOf(args, "--selftest");
         StartedInBackground = args.Contains("--background");

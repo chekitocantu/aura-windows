@@ -28,4 +28,21 @@ New-Item -ItemType Directory -Force $Dest | Out-Null
 # Keep only what Aura needs.
 Get-ChildItem $Dest -Exclude 'mpv.exe', '*.dll', 'mpv.com' | Remove-Item -Recurse -Force
 if (-not (Test-Path (Join-Path $Dest 'mpv.exe'))) { throw 'mpv.exe missing after extract' }
+
+# mpv.exe imports vulkan-1.dll. GPU drivers usually install it, but not every PC has it,
+# so ship the official Khronos loader from LunarG's runtime (pinned and hash-checked).
+$vkVersion = '1.4.363.0'
+$vkSha = 'a25a927aa8b9f0371048f1861cf88ac3b9bc9b1fb332c42d897c8ab32695769a'
+$vkZip = Join-Path $tmp 'vulkan-rt.zip'
+Invoke-WebRequest "https://sdk.lunarg.com/sdk/download/$vkVersion/windows/vulkan-runtime-components.zip" -OutFile $vkZip
+$got = (Get-FileHash -Algorithm SHA256 $vkZip).Hash.ToLowerInvariant()
+if ($got -ne $vkSha) { throw "Vulkan runtime SHA-256 mismatch: $got" }
+$vkDir = Join-Path $tmp 'vulkan-rt'
+Expand-Archive $vkZip -DestinationPath $vkDir -Force
+$vkDll = Get-ChildItem $vkDir -Recurse -Filter vulkan-1.dll | Where-Object { $_.Directory.Name -eq 'x64' } | Select-Object -First 1
+$sig = Get-AuthenticodeSignature $vkDll.FullName
+if ($sig.Status -ne 'Valid') { throw "vulkan-1.dll signature is $($sig.Status)" }
+Write-Host "vulkan-1.dll signed by $($sig.SignerCertificate.Subject)"
+Copy-Item $vkDll.FullName $Dest
+Copy-Item (Get-ChildItem $vkDir -Recurse -Filter VulkanRT-License.txt | Select-Object -First 1).FullName $Dest
 Get-ChildItem $Dest | Format-Table Name, Length
