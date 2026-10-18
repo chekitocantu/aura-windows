@@ -252,8 +252,9 @@ public partial class ExploreView : UserControl, IPage
     {
         const double gap = 16, min = 250;
         var width = Math.Max(0, Scroller.ActualWidth - 24);
-        var cols = Math.Max(1, (int)((width + gap) / (min + gap)));
-        CardSlot = Math.Floor((width + gap) / cols);
+        // Each slot holds a card plus its 16px right margin, so slots must add up to the width.
+        var cols = Math.Max(1, (int)(width / (min + gap)));
+        CardSlot = Math.Floor(width / cols);
         CardImageHeight = Math.Round((CardSlot - gap) * 9 / 16);
     }
 }

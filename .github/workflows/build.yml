@@ -83,12 +83,30 @@ jobs:
           $out = Join-Path $PWD 'selftest'
           New-Item -ItemType Directory -Force $out | Out-Null
           Get-Process explorer -ErrorAction SilentlyContinue | Format-Table Id, SessionId
+          # Clear the desktop so the screenshots show the wallpaper.
+          (New-Object -ComObject Shell.Application).MinimizeAll()
+          Start-Sleep 2
           $p = Start-Process -FilePath app\Aura.exe -ArgumentList '--selftest', "`"$out`"" -PassThru
           if (-not $p.WaitForExit(240000)) { $p.Kill(); Write-Host 'self-test timed out' }
           Copy-Item "$env:LOCALAPPDATA\Aura\logs\*" $out -ErrorAction SilentlyContinue
           if (Test-Path "$out\report.txt") { Get-Content "$out\report.txt" } else { Write-Host 'no report' }
           "exit=$($p.ExitCode)" | Out-File "$out\exit.txt"
           if ($p.ExitCode -ne 0) { exit 1 }
+
+      - name: mpv diagnostics
+        if: always()
+        shell: pwsh
+        run: |
+          $out = Join-Path $PWD 'selftest'
+          & app\mpv\mpv.com --version 2>&1 | Tee-Object "$out\mpv-version.txt"
+          "exit=$LASTEXITCODE" | Tee-Object -Append "$out\mpv-version.txt"
+          $video = Get-ChildItem selftest\library -Filter *.mp4 | Select-Object -First 1
+          $p = Start-Process app\mpv\mpv.exe -PassThru -ArgumentList '--no-config','--force-window=yes','--loop-file=inf',"--log-file=$out\mpv-diag.log",'--',"`"$($video.FullName)`""
+          Start-Sleep 12
+          $p.Refresh()
+          "hasExited=$($p.HasExited) mainWindow=$($p.MainWindowHandle) title=$($p.MainWindowTitle)" | Tee-Object "$out\mpv-diag.txt"
+          Get-Process | Where-Object MainWindowHandle -ne 0 | Format-Table Id, ProcessName, MainWindowTitle -AutoSize | Out-String | Tee-Object -Append "$out\mpv-diag.txt"
+          if (-not $p.HasExited) { $p.Kill() }
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -98,6 +116,7 @@ jobs:
             selftest/*.png
             selftest/*.txt
             selftest/*.log
+          if-no-files-found: ignore
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
